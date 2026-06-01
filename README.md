@@ -47,6 +47,9 @@
 </p>
 
 <div align="center" markdown="1">
+  <strong>Sponsored by Warp</strong>
+  <br>
+  <br>
   <a href="https://go.warp.dev/chatbox">
     <img alt="Warp sponsorship" width="400" src="https://raw.githubusercontent.com/warpdotdev/brand-assets/refs/heads/main/Github/Sponsor/Warp-Github-LG-02.png">
   </a>
