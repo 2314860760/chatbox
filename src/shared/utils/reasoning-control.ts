@@ -1,4 +1,10 @@
 import { isDeepSeekReasoningEffortModel, isDeepSeekReasoningModel } from '../models/utils/deepseek'
+import {
+  getNvidiaReasoningEffortForLevel,
+  getNvidiaReasoningEfforts,
+  getNvidiaReasoningLevelForEffort,
+  getNvidiaReasoningProfile,
+} from '../providers/nvidia-reasoning'
 import type { ModelProvider, ProviderModelInfo, ProviderOptions } from '../types'
 import { ModelProviderEnum } from '../types'
 import {
@@ -84,6 +90,7 @@ export interface ReasoningControlCapabilities {
     | 'budget'
     | 'deepseek-effort'
     | 'level'
+    | 'nvidia-effort'
     | 'openai-effort'
     | 'openrouter-reasoning'
     | 'toggle'
@@ -93,7 +100,7 @@ export interface ReasoningControlCapabilities {
 
 export interface ReasoningControlOption {
   level: ReasoningControlLevel
-  label: 'default' | 'off' | 'on' | 'low' | 'medium' | 'high'
+  label: 'default' | 'off' | 'on' | 'low' | 'medium' | 'high' | 'xhigh' | 'max'
 }
 
 const DEFAULT_CAPABILITIES: ReasoningControlCapabilities = {
@@ -183,6 +190,9 @@ function supportsExplicitDisable(
   effectiveProvider: ModelProvider | undefined,
   modelId: string
 ): boolean {
+  if (effectiveProvider === ModelProviderEnum.NvidiaNIM) {
+    return getNvidiaReasoningEfforts(modelId).includes('none')
+  }
   if (effectiveProvider === ModelProviderEnum.Gemini && !canDisableGoogleThinking(modelId)) {
     return false
   }
@@ -375,6 +385,10 @@ export function getReasoningControlCapabilities(
 
   const effectiveProvider = getEffectiveProvider(provider, model)
   const isChatboxDeepSeek = isChatboxAIDeepSeekWithOfficialApiStyle(provider, model)
+  if (effectiveProvider === ModelProviderEnum.NvidiaNIM) {
+    const profile = getNvidiaReasoningProfile(modelId)
+    return profile && profile.mode !== 'fixed' ? { supported: true, kind: 'nvidia-effort' } : DEFAULT_CAPABILITIES
+  }
   const disabledReason = getApiStyleDisabledReason(provider, effectiveProvider, model)
   if (disabledReason) {
     return { supported: false, kind: 'toggle', disabledReason }
@@ -406,7 +420,10 @@ export function getReasoningControlCapabilities(
   if (model && isOpenAICompatibleApiStyle(provider, model) && isDeepSeekThinkingModel(model)) {
     return { supported: true, kind: isDeepSeekReasoningEffortModel(modelId) ? 'deepseek-effort' : 'toggle' }
   }
-  if (isOpenAIStyleEffectiveProvider(effectiveProvider) && isGptEffortModel(modelId)) {
+  if (
+    isOpenAIStyleEffectiveProvider(effectiveProvider) &&
+    (isGptEffortModel(modelId) || model.capabilities?.includes('reasoning'))
+  ) {
     return { supported: true, kind: 'openai-effort' }
   }
   if (
@@ -499,6 +516,9 @@ function deriveReasoningControlLevel(
   if (!capabilities.supported) return 'default'
 
   const effectiveProvider = getEffectiveProvider(provider, model)
+  if (effectiveProvider === ModelProviderEnum.NvidiaNIM) {
+    return getNvidiaReasoningLevelForEffort(model?.modelId || '', providerOptions?.nvidia?.reasoningEffort) || 'default'
+  }
   if (isChatboxAIDeepSeekWithOfficialApiStyle(provider, model)) {
     const modelId = model?.modelId || ''
     if (model?.apiStyle === 'anthropic') {
@@ -593,6 +613,20 @@ export function getReasoningControlOptions(
     ? [{ level: 'off', label: 'off' }]
     : []
 
+  if (capabilities.kind === 'nvidia-effort') {
+    const enabledEfforts = getNvidiaReasoningEfforts(model?.modelId || '').filter((effort) => effort !== 'none')
+    const levels: ReasoningEffortLevel[] =
+      enabledEfforts.length <= 1 ? ['high'] : enabledEfforts.length === 2 ? ['low', 'high'] : ['low', 'medium', 'high']
+    const effortOptions: ReasoningControlOption[] = levels.map((level) => {
+      const effort = getNvidiaReasoningEffortForLevel(model?.modelId || '', level)
+      return {
+        level,
+        label: enabledEfforts.length === 1 ? 'on' : !effort || effort === 'none' ? level : effort,
+      }
+    })
+    return [{ level: 'default', label: 'default' }, ...offOption, ...effortOptions]
+  }
+
   if (capabilities.kind === 'toggle') {
     return [{ level: 'default', label: 'default' }, ...offOption, { level: 'high', label: 'on' }]
   }
@@ -635,7 +669,9 @@ export function getReasoningProviderOptions(
     : { ...(previous || {}) }
 
   if (level === 'off') {
-    if (isChatboxAIDeepSeekWithOfficialApiStyle(provider, model)) {
+    if (effectiveProvider === ModelProviderEnum.NvidiaNIM) {
+      next.nvidia = { reasoningEffort: 'none' }
+    } else if (isChatboxAIDeepSeekWithOfficialApiStyle(provider, model)) {
       if (model?.apiStyle === 'anthropic') {
         next.claude = { thinking: { type: 'disabled' } }
       } else if (model?.apiStyle === 'openai-responses') {
@@ -668,7 +704,10 @@ export function getReasoningProviderOptions(
     return compactProviderOptions(next)
   }
 
-  if (isChatboxAIDeepSeekWithOfficialApiStyle(provider, model)) {
+  if (effectiveProvider === ModelProviderEnum.NvidiaNIM) {
+    const reasoningEffort = getNvidiaReasoningEffortForLevel(model?.modelId || '', level)
+    if (reasoningEffort) next.nvidia = { reasoningEffort }
+  } else if (isChatboxAIDeepSeekWithOfficialApiStyle(provider, model)) {
     const effort = isDeepSeekReasoningEffortModel(model?.modelId || '') ? DEEPSEEK_EFFORT_BY_LEVEL[level] : undefined
     if (model?.apiStyle === 'anthropic') {
       next.claude = { thinking: { type: 'enabled' }, ...(effort ? { effort } : {}) }
@@ -835,6 +874,7 @@ function compactProviderOptions(options: ProviderOptions): ProviderOptions | und
   if (!next.deepseek) delete next.deepseek
   if (!next.openaiCompatible) delete next.openaiCompatible
   if (!next.openrouter) delete next.openrouter
+  if (!next.nvidia) delete next.nvidia
   return Object.keys(next).length > 0 ? next : undefined
 }
 
@@ -847,6 +887,7 @@ const REASONING_PROVIDER_OPTION_KEYS = [
   'deepseek',
   'openaiCompatible',
   'openrouter',
+  'nvidia',
 ] as const satisfies readonly (keyof ProviderOptions)[]
 
 /**

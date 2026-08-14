@@ -1,5 +1,5 @@
-import type { ModelInterface } from '../models/types'
 import { enrichModelFromRegistry } from '../model-registry/enrich'
+import type { ModelInterface } from '../models/types'
 import { mergeSharedOAuthProviderSettings, resolveEffectiveApiKey } from '../oauth'
 import type { Config, ProviderModelInfo, ProviderSettings, SessionSettings, Settings } from '../types'
 import type { ModelDependencies } from '../types/adapters'
@@ -30,6 +30,7 @@ import './definitions/chatglm'
 import './definitions/github-copilot'
 import './definitions/bedrock'
 import './definitions/vercel-ai-gateway'
+import './definitions/nvidia-nim'
 import {
   clearProviderRegistry,
   defineProvider,

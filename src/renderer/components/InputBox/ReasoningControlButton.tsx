@@ -219,7 +219,9 @@ function getDisabledReasonLabel(reason: ReasoningControlDisabledReason, t: (key:
 
 function getOptionLabel(option: ReasoningControlOption, t: (key: string) => string): string {
   if (option.label === 'on') return t('On')
-  return getLevelLabel(option.level, t)
+  if (option.label === 'xhigh') return 'XHigh'
+  if (option.label === 'max') return 'Max'
+  return getLevelLabel(option.label, t)
 }
 
 function getLevelLabel(level: ReasoningControlLevel, t: (key: string) => string): string {

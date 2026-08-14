@@ -173,6 +173,10 @@ const OpenRouterParamsSchema = z.object({
   reasoning: ReasoningOptionsSchema.optional().catch(undefined),
 })
 
+const NvidiaParamsSchema = z.object({
+  reasoningEffort: z.enum(['none', 'low', 'medium', 'high', 'xhigh', 'max']).optional().catch(undefined),
+})
+
 export const ProviderOptionsSchema = z.object({
   claude: ClaudeParamsSchema.optional(),
   openai: OpenAIParamsSchema.optional(),
@@ -180,6 +184,7 @@ export const ProviderOptionsSchema = z.object({
   deepseek: DeepSeekParamsSchema.optional(),
   openaiCompatible: OpenAICompatibleParamsSchema.optional(),
   openrouter: OpenRouterParamsSchema.optional(),
+  nvidia: NvidiaParamsSchema.optional(),
 })
 
 // NOTICE: Global settings is for new session default settings, set to session when session created, changes will not affect existing sessions

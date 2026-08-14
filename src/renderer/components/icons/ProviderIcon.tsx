@@ -1,5 +1,6 @@
 import MinimaxColor from '@lobehub/icons/es/Minimax/components/Color'
 import MoonshotMono from '@lobehub/icons/es/Moonshot/components/Mono'
+import NvidiaColor from '@lobehub/icons/es/Nvidia/components/Color'
 import QwenColor from '@lobehub/icons/es/Qwen/components/Color'
 import { type ModelProvider, ModelProviderEnum } from '@shared/types'
 import BrandGithub from './BrandGithub'
@@ -21,6 +22,10 @@ export default function ProviderIcon(props: { className?: string; size?: number;
 
   if ([ModelProviderEnum.Moonshot, ModelProviderEnum.MoonshotCN].includes(provider as ModelProviderEnum)) {
     return <MoonshotMono className={className} size={size} style={{ color: 'currentColor' }} />
+  }
+
+  if (provider === ModelProviderEnum.NvidiaNIM) {
+    return <NvidiaColor className={className} size={size} />
   }
 
   return (
